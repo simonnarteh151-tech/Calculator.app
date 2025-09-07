@@ -1,0 +1,50 @@
+name: Build APK
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y python3-pip git zip unzip openjdk-17-jdk wget
+          pip install buildozer cython
+
+      - name: Install Android SDK & NDK
+        run: |
+          mkdir -p $HOME/.buildozer/android/platform
+          cd $HOME/.buildozer/android/platform
+          # Download commandline tools
+          wget https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip -O cmdtools.zip
+          unzip cmdtools.zip -d cmdline-tools
+          mkdir -p $HOME/.buildozer/android/platform/cmdline-tools/latest
+          mv cmdline-tools/* $HOME/.buildozer/android/platform/cmdline-tools/latest/
+          export ANDROID_SDK_ROOT=$HOME/.buildozer/android/platform
+          yes | $HOME/.buildozer/android/platform/cmdline-tools/latest/bin/sdkmanager --licenses
+          $HOME/.buildozer/android/platform/cmdline-tools/latest/bin/sdkmanager --install "platform-tools" "platforms;android-33" "build-tools;33.0.2" "ndk;23.1.7779620"
+
+      - name: Build APK
+        env:
+          ANDROIDSDK: $HOME/.buildozer/android/platform
+          ANDROIDNDK: $HOME/.buildozer/android/platform/ndk/23.1.7779620
+        run: |
+          buildozer -v android debug
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: calculator-apk
+          path: bin/*.apk
